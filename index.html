@@ -1,0 +1,250 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Sistema de Antecedentes Policiales</title>
+<style>
+  body {
+    background-color: #000;
+    color: white;
+    font-family: Arial, sans-serif;
+    display: flex;
+    justify-content: center;
+    padding: 40px;
+  }
+  .container {
+    background-color: #111;
+    padding: 25px;
+    border-radius: 10px;
+    width: 95%;
+    max-width: 750px;
+  }
+  input, textarea, button {
+    width: 100%;
+    padding: 10px;
+    margin: 6px 0;
+    border: none;
+    border-radius: 6px;
+    font-size: 15px;
+    box-sizing: border-box;
+  }
+  input, textarea {
+    background-color: #222;
+    color: white;
+  }
+  button {
+    background: linear-gradient(90deg, orange, red);
+    color: white;
+    font-weight: bold;
+    cursor: pointer;
+  }
+  hr {
+    border: 0;
+    border-top: 1px solid #333;
+    margin: 20px 0;
+  }
+  .result {
+    background-color: #151515;
+    padding: 12px;
+    border-radius: 8px;
+    margin-top: 12px;
+  }
+  .paid { color: #00ff99; font-weight: bold; }
+  .unpaid { color: #ff6666; font-weight: bold; }
+  .state-button {
+    background-color: #333;
+    color: white;
+    border: none;
+    padding: 6px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    margin-top: 6px;
+  }
+</style>
+</head>
+<body>
+<div class="container">
+<h2>
+  <img src="https://images-ext-1.discordapp.net/external/u0hUUpY2L-1NsY9gpZlYgu2i_cdENiUZQaWumz4ebE0/https/cdn.discordapp.com/icons/1429630673509154938/380bbe3453a22ddff65970e5dbdba05c.png" alt="Lupa" style="width:30px; vertical-align:middle; margin-right:8px;">
+  | MDT POLICIAL
+</h2>
+  <input id="searchRut" placeholder="Ejemplo: 12.345.678-9">
+  <button id="btnBuscar">Buscar</button>
+  <div id="resultados" class="result" style="display:none"></div>
+
+  <hr>
+
+  <h3>🔐 Panel Carabineros</h3>
+  <button id="btnAcceder">Ingresar contraseña</button>
+
+  <div id="formContainer" style="display:none; margin-top:15px;">
+    <h3>➕ Agregar nuevo antecedente</h3>
+    <input id="nombre" placeholder="Nombre completo">
+    <input id="rut" placeholder="RUT">
+    <input id="documento" placeholder="Número de documento">
+    <textarea id="articulos" placeholder="Artículos"></textarea>
+    <input id="valor" placeholder="Valor">
+    <button id="btnAgregar">Agregar antecedente</button>
+    <div id="estadoMsg" style="font-size:14px; margin-top:10px;"></div>
+  </div>
+</div>
+
+<script>
+  // ================= CONFIGURACIÓN =================
+  const BIN_ID = "6902967fae596e708f36a24a"; // ejemplo: 67002f9343b1c97be9863276
+  const MASTER_KEY = "$2a$10$DeRc0oEFIUQMGppk09gXk.bCGQSM30fcxK02PzZ4.6L/Q6jt3ONWa"; // tu master key de JSONBin
+  const PASSWORD = "CarabinerosDeChileCHCRP";
+  const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
+  // =================================================
+
+  const resultados = document.getElementById("resultados");
+  const estadoMsg = document.getElementById("estadoMsg");
+
+  // --- FUNCIONES BASE JSONBIN ---
+  async function fetchData() {
+    try {
+      const res = await fetch(`${API_URL}/latest`, {
+        headers: { "X-Master-Key": MASTER_KEY }
+      });
+      const data = await res.json();
+      // Si el bin está vacío o sin "antecedentes", inicializa
+      if (!data.record || !data.record.antecedentes) {
+        return { antecedentes: [] };
+      }
+      return data.record;
+    } catch (e) {
+      console.error("Error al obtener datos:", e);
+      return { antecedentes: [] };
+    }
+  }
+
+  async function saveData(obj) {
+    await fetch(API_URL, {
+      method: "PUT",
+      headers: {
+        "Content-Type": "application/json",
+        "X-Master-Key": MASTER_KEY
+      },
+      body: JSON.stringify(obj)
+    });
+  }
+
+  function normalizeRut(rut) {
+    return rut.replace(/\./g, "").replace(/\s+/g, "").toUpperCase();
+  }
+
+  function generarID() {
+    return Date.now().toString(36) + Math.random().toString(36).substring(2, 8);
+  }
+
+  // --- BUSCAR ANTECEDENTES ---
+  document.getElementById("btnBuscar").addEventListener("click", async () => {
+    const rut = normalizeRut(document.getElementById("searchRut").value.trim());
+    if (!rut) return alert("Ingrese un RUT válido.");
+
+    resultados.style.display = "block";
+    resultados.innerHTML = "Buscando antecedentes...";
+
+    const db = await fetchData();
+    const encontrados = db.antecedentes.filter(a => normalizeRut(a.rut) === rut);
+
+    if (encontrados.length === 0) {
+      resultados.innerHTML = `<p>No se encontraron antecedentes para el RUT <b>${rut}</b></p>`;
+      return;
+    }
+
+    let html = `<h4>Antecedentes (${encontrados.length})</h4>`;
+    encontrados.forEach(a => {
+      html += `
+        <div style="background:#0f0f0f;padding:10px;border-radius:8px;margin-top:10px">
+          <strong>Nombre:</strong> ${a.nombre}<br>
+          <strong>Documento:</strong> ${a.documento}<br>
+          <strong>Artículos:</strong> ${a.articulos}<br>
+          <strong>Valor:</strong> $${a.valor}<br>
+          <strong>Estado:</strong> 
+          <span class="${a.estado === "pagado" ? "paid" : "unpaid"}">${a.estado}</span><br>
+          <button class="state-button" onclick="cambiarEstado('${a.id}')">Cambiar estado</button>
+        </div>
+      `;
+    });
+
+    resultados.innerHTML = html;
+  });
+
+  // --- PANEL DE CONTRASEÑA ---
+  document.getElementById("btnAcceder").addEventListener("click", () => {
+    const pass = prompt("Ingrese la contraseña de Carabineros:");
+    if (pass === PASSWORD) {
+      alert("Acceso concedido.");
+      document.getElementById("formContainer").style.display = "block";
+    } else {
+      alert("Contraseña incorrecta.");
+    }
+  });
+
+  // --- AGREGAR ANTECEDENTE ---
+  document.getElementById("btnAgregar").addEventListener("click", async () => {
+    const nombre = document.getElementById("nombre").value.trim();
+    const rut = document.getElementById("rut").value.trim();
+    const documento = document.getElementById("documento").value.trim();
+    const articulos = document.getElementById("articulos").value.trim();
+    const valor = document.getElementById("valor").value.trim();
+
+    if (!nombre || !rut || !documento || !articulos || !valor)
+      return alert("Completa todos los campos.");
+
+    estadoMsg.textContent = "Agregando antecedente...";
+
+    const db = await fetchData();
+    if (!db.antecedentes) db.antecedentes = [];
+
+    db.antecedentes.push({
+      id: generarID(),
+      nombre,
+      rut,
+      documento,
+      articulos,
+      valor,
+      estado: "no pagado"
+    });
+
+    await saveData(db);
+
+    estadoMsg.textContent = "✅ Antecedente agregado correctamente.";
+
+    document.getElementById("nombre").value = "";
+    document.getElementById("rut").value = "";
+    document.getElementById("documento").value = "";
+    document.getElementById("articulos").value = "";
+    document.getElementById("valor").value = "";
+
+    // Si se está viendo ese RUT, actualizar
+    const buscado = normalizeRut(document.getElementById("searchRut").value || "");
+    if (normalizeRut(rut) === buscado) {
+      document.getElementById("btnBuscar").click();
+    }
+  });
+
+  // --- CAMBIAR ESTADO ---
+  async function cambiarEstado(id) {
+    const confirmar = confirm("¿Deseas cambiar el estado de este antecedente?");
+    if (!confirmar) return;
+
+    const db = await fetchData();
+    const idx = db.antecedentes.findIndex(a => a.id === id);
+    if (idx === -1) return alert("No se encontró el antecedente.");
+
+    db.antecedentes[idx].estado =
+      db.antecedentes[idx].estado === "pagado" ? "no pagado" : "pagado";
+
+    await saveData(db);
+
+    alert("Estado actualizado correctamente.");
+    document.getElementById("btnBuscar").click();
+  }
+
+  window.cambiarEstado = cambiarEstado;
+</script>
+</body>
+</html>
