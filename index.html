@@ -92,8 +92,8 @@
 
 <script>
   // ================= CONFIGURACIÓN =================
-  const BIN_ID = "6902967fae596e708f36a24a"; // ejemplo: 67002f9343b1c97be9863276
-  const MASTER_KEY = "$2a$10$DeRc0oEFIUQMGppk09gXk.bCGQSM30fcxK02PzZ4.6L/Q6jt3ONWa"; // tu master key de JSONBin
+  const BIN_ID = "6902967fae596e708f36a24a"; 
+  const MASTER_KEY = "$2a$10$DeRc0oEFIUQMGppk09gXk.bCGQSM30fcxK02PzZ4.6L/Q6jt3ONWa"; 
   const PASSWORD = "CarabinerosDeChileCHCRP";
   const API_URL = `https://api.jsonbin.io/v3/b/${BIN_ID}`;
   // =================================================
@@ -108,7 +108,6 @@
         headers: { "X-Master-Key": MASTER_KEY }
       });
       const data = await res.json();
-      // Si el bin está vacío o sin "antecedentes", inicializa
       if (!data.record || !data.record.antecedentes) {
         return { antecedentes: [] };
       }
@@ -219,15 +218,20 @@
     document.getElementById("articulos").value = "";
     document.getElementById("valor").value = "";
 
-    // Si se está viendo ese RUT, actualizar
     const buscado = normalizeRut(document.getElementById("searchRut").value || "");
     if (normalizeRut(rut) === buscado) {
       document.getElementById("btnBuscar").click();
     }
   });
 
-  // --- CAMBIAR ESTADO ---
+  // --- CAMBIAR ESTADO CON CONTRASEÑA ---
   async function cambiarEstado(id) {
+    const pass = prompt("Ingrese la contraseña para cambiar el estado:");
+    if (pass !== "MinisterioPublicoCHCRP") {
+      alert("Contraseña incorrecta. No se puede cambiar el estado.");
+      return;
+    }
+
     const confirmar = confirm("¿Deseas cambiar el estado de este antecedente?");
     if (!confirmar) return;
 
